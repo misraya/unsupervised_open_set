@@ -105,9 +105,6 @@ def main():
         train_losses.extend(train_loss)
         val_losses.append(val_loss)
 
-        # recons = vis_recons(model, val_loader)
-        # show_samples(recons, fname="plots/vanilla_recons_"+"epoch"+str(i))
-
         print('epoch [{}/{}], loss:{:.4f}'.format(i+1, config.epochs, sum(train_loss)/len(train_loss)))
 
         imgs = next(iter(val_loader))[0]
@@ -119,7 +116,7 @@ def main():
         save_image(all, './plots/vanilla_recons_epoch{}.png'.format(i))
 
         if (i+1) % 5 == 0:
-            torch.save(model, "ckpt/checkpoint_"+str(i)+".pth")
+            torch.save(model, "ckpt/vanilla_ae/checkpoint_"+str(i)+".pth")
 
 
 if __name__ == "__main__":
