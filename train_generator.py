@@ -158,23 +158,10 @@ def main():
     wandb.init(project="547_term", config=configs)
     config = wandb.config
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = VanillaAE().to(device)
-    loss_fn = nn.MSELoss(reduction="mean")
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate, betas=config.betas, weight_decay=1e-4)
-    #scheduler = StepLR(optimizer, step_size=config.lr_sch_step, gamma=config.lr_sch_gamma)
-    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=10, threshold_mode='abs')
-
     train_transform = T.Compose([T.ToPILImage(), T.RandomCrop(32, padding=4), T.RandomHorizontalFlip(), T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
     val_transform = T.Compose([T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
-
-    train_set = torchvision.datasets.CIFAR10(root='./dataset', train=True, download=True)
-    #train_loader = torch.utils.data.DataLoader(train_set, batch_size=config.batch_size, shuffle=True, num_workers=8)
-
-    val_set = torchvision.datasets.CIFAR10(root='./dataset', train=False, download=True)
-    #val_loader = torch.utils.data.DataLoader(val_set, batch_size=config.batch_size, shuffle=False, num_workers=8)
-
+    train_set = torchvision.datasets.CIFAR10(root='./dataset', train=True, shuffle=True, download=True)
+    val_set = torchvision.datasets.CIFAR10(root='./dataset', train=False, shuffle=False, download=True)
 
     # Separating trainset/testset data/label
     x_train = train_set.data
@@ -188,10 +175,17 @@ def main():
     split_test_set = DatasetMaker(
         [get_class_i(x_test, y_test, classDict[class_name]) for class_name in KNOWN_SPLIT_NAMES[config.split]], val_transform)
 
-
     # Create datasetLoaders from trainset and testset
     train_loader = DataLoader(split_train_set, batch_size=config.batch_size, shuffle=True, num_workers=8)
     val_loader = DataLoader(split_test_set, batch_size=config.batch_size, shuffle=False, num_workers=8)
+
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = VanillaAE().to(device)
+    loss_fn = nn.MSELoss(reduction="mean")
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate, betas=config.betas, weight_decay=1e-4)
+    #scheduler = StepLR(optimizer, step_size=config.lr_sch_step, gamma=config.lr_sch_gamma)
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=10, threshold_mode='abs')
 
     out_dir = "norm_vanilla_ae_split"+str(config.split)
 

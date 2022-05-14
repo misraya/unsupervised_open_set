@@ -2,3 +2,5 @@ model/wandb/*
 model/__pycache__/*
 wandb/*
 dataset/*
+plots/*
+ckpt/*
