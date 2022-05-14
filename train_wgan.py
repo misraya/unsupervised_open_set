@@ -195,7 +195,7 @@ def train(model, train_loader, config):
             samples = samples.mul(0.5).add(0.5)
             samples = samples.data.cpu()[:64]
             grid = make_grid(samples)
-            save_image(grid, 'training_result_images/img_generatori_iter_{}.png'.format(str(g_iter).zfill(3)))
+            save_image(grid, 'training_result_images/img_generator_iter_{}.png'.format(str(g_iter).zfill(3)))
 
             # Testing
             time = t.time() - model.t_begin
@@ -207,9 +207,9 @@ def train(model, train_loader, config):
             #output = str(g_iter) + " " + str(time) + " " + str(inception_score[0]) + "\n"
             #model.file.write(output)
 
-            real = model.real_images(images, model.number_of_images)
+            #real = model.real_images(images, model.number_of_images)
             generated = model.generate_img(z, model.number_of_images)
-            merged = torch.stack((real, generated), dim=1).view(-1,3,32,32)
+            #merged = torch.stack((real, generated), dim=1).view(-1,3,32,32)
 
             info = {
                 'Wasserstein distance': Wasserstein_D.data,
@@ -217,7 +217,7 @@ def train(model, train_loader, config):
                 'Loss G': g_cost.data,
                 'Loss D Real': d_loss_real.data,
                 'Loss D Fake': d_loss_fake.data,
-                'images': wandb.Image(merged, caption="images (real T, generated B)"),
+                'images': wandb.Image(generated, caption="generated images"),
             }
 
             wandb.log(info)
@@ -250,9 +250,9 @@ def main():
         "model":"wgan_gp",
         "channels":3,
         "batch_size": 64,
-        "learning_rate":1e-3,
+        "learning_rate":1e-4,
         "betas":(0.5, 0.999),
-        "iters": 1000,
+        "iters": 40000,
         "train": True,
         "cuda": True,
         "split": 1

@@ -160,8 +160,8 @@ def main():
 
     train_transform = T.Compose([T.ToPILImage(), T.RandomCrop(32, padding=4), T.RandomHorizontalFlip(), T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
     val_transform = T.Compose([T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
-    train_set = torchvision.datasets.CIFAR10(root='./dataset', train=True, shuffle=True, download=True)
-    val_set = torchvision.datasets.CIFAR10(root='./dataset', train=False, shuffle=False, download=True)
+    train_set = torchvision.datasets.CIFAR10(root='./dataset', train=True, download=True)
+    val_set = torchvision.datasets.CIFAR10(root='./dataset', train=False, download=True)
 
     # Separating trainset/testset data/label
     x_train = train_set.data
