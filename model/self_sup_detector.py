@@ -337,9 +337,11 @@ def get_self_supervised_detector(replace_first_conv=True):
     # clone the weights from the pretrained model
     # repace model.roi_heads.box_predictor
     in_channels, out_classes = model.roi_heads.box_predictor.cls_score.in_features, model.roi_heads.box_predictor.cls_score.out_features
-    box_predictor = FastRCNNPredictorPlus(in_channels, out_classes)
-    box_predictor.cls_score.load_state_dict(model.roi_heads.box_predictor.cls_score.state_dict())
-    box_predictor.bbox_pred.load_state_dict(model.roi_heads.box_predictor.bbox_pred.state_dict())
+    
+    # TO DO: FIX load_state_dict() MISMATCH WHEN USING num_classes = 7!!!! Need to skip specific key
+    box_predictor = FastRCNNPredictorPlus(in_channels=in_channels, num_classes=out_classes) #7 # <---------------- IMPORTANT!!
+    box_predictor.cls_score.load_state_dict(model.roi_heads.box_predictor.cls_score.state_dict(), strict=False)
+    box_predictor.bbox_pred.load_state_dict(model.roi_heads.box_predictor.bbox_pred.state_dict(), strict=False)
     model.roi_heads.box_predictor = box_predictor
 
 
