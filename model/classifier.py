@@ -65,4 +65,4 @@ class Classifier(nn.Module):
         if return_features:
             return out
         
-        return self.classification_linear(out), self.transformation_linear
+        return self.classification_linear(out), self.transformation_linear(out)
