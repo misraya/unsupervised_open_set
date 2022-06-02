@@ -99,3 +99,9 @@ def clamp_to_unit_sphere(x, components=1):
         latent_subspaces.append(subspace)
     # Join the normalized pieces back together
     return torch.cat(latent_subspaces, dim=1)
+
+def to_img(x):
+    x = 0.5 * (x + 1)
+    x = x.clamp(0, 1)
+    x = x.view(x.size(0), 3, 32, 32)
+    return x

@@ -8,11 +8,14 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
 import random
-from model.wgan import SAVE_PER_TIMES, WGAN_GP
 import wandb
 from torchvision.utils import make_grid, save_image
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 import time as t
+
+from model.wgan import SAVE_PER_TIMES, WGAN_GP
+from model.utils import to_img
+from data.dataset_maker import split_dataset
 
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
@@ -20,81 +23,9 @@ np.random.seed(0)
 random.seed(0)
 
 
-CIFAR_CLASSES = ['plane', 'car', 'bird', 'cat', 'deer','dog', 'frog', 'horse', 'ship', 'truck']
-classDict = {'plane': 0, 'car': 1, 'bird': 2, 'cat': 3, 'deer': 4,'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8, 'truck': 9}
-SPLITS = [ [3, 6, 7, 8],
-        [1, 2, 4, 6],
-        [2, 3, 4, 9],
-        [0, 1, 2, 6],
-        [4, 5, 6, 9]]
-KNOWN_SPLITS = [[0,1,2,4,5,9],
-        [0,3,5,7,8,9],
-        [0,1,5,6,7,8],
-        [3,4,5,7,8,9],
-        [0,1,2,3,7,8]]
-KNOWN_SPLIT_NAMES = [[CIFAR_CLASSES[i] for i in s] for s in KNOWN_SPLITS]
-SAVE_PER_TIMES=50
-
-# Define a function to separate CIFAR classes by class index
-def get_class_i(x, y, i):
-    """
-    x: trainset.train_data or testset.test_data
-    y: trainset.train_labels or testset.test_labels
-    i: class label, a number between 0 to 9
-    return: x_i
-    """
-    # Convert to a numpy array
-    y = np.array(y)
-    # Locate position of labels that equal to i
-    pos_i = np.argwhere(y == i)
-    # Convert the result into a 1-D list
-    pos_i = list(pos_i[:, 0])
-    # Collect all data that match the desired label
-    x_i = [x[j] for j in pos_i]
-
-    return x_i
-
-
-class DatasetMaker(Dataset):
-    def __init__(self, datasets, transforms):
-        """
-        datasets: a list of get_class_i outputs, i.e. a list of list of images for selected classes
-        """
-        self.datasets = datasets
-        self.lengths = [len(d) for d in self.datasets]
-        self.transforms = transforms
-
-    def __getitem__(self, i):
-        class_label, index_wrt_class = self.index_of_which_bin(self.lengths, i)
-        img = self.datasets[class_label][index_wrt_class]
-        img = self.transforms(img)
-        return img, class_label
-
-    def __len__(self):
-        return sum(self.lengths)
-
-    def index_of_which_bin(self, bin_sizes, absolute_index, verbose=False):
-        """
-        Given the absolute index, returns which bin it falls in and which element of that bin it corresponds to.
-        """
-        # Which class/bin does i fall into?
-        accum = np.add.accumulate(bin_sizes)
-        if verbose:
-            print("accum =", accum)
-        bin_index = len(np.argwhere(accum <= absolute_index))
-        if verbose:
-            print("class_label =", bin_index)
-        # Which element of the fallent class/bin does i correspond to?
-        index_wrt_class = absolute_index - np.insert(accum, 0, 0)[bin_index]
-        if verbose:
-            print("index_wrt_class =", index_wrt_class)
-
-        return bin_index, index_wrt_class
-
-
 def train(model, train_loader, config):
     model.t_begin = t.time()
-    model.file = open("inception_score_graph.txt", "w")
+    # model.file = open("inception_score_graph.txt", "w")
 
     # Now batches are callable model.data.next()
     model.data = model.get_infinite_batches(train_loader)
@@ -186,8 +117,8 @@ def train(model, train_loader, config):
             # inception_score = get_inception_score(new_sample_list, cuda=True, batch_size=32,
             #                                       resize=True, splits=10)
 
-            if not os.path.exists('training_result_images/'):
-                os.makedirs('training_result_images/')
+            if not os.path.exists(config.img_output_dir):
+                os.makedirs(config.img_output_dir)
 
             # Denormalize images and save them in grid 8x8
             z = model.get_torch_variable(torch.randn(800, 100, 1, 1))
@@ -195,7 +126,7 @@ def train(model, train_loader, config):
             samples = samples.mul(0.5).add(0.5)
             samples = samples.data.cpu()[:64]
             grid = make_grid(samples)
-            save_image(grid, 'training_result_images/img_generator_iter_{}.png'.format(str(g_iter).zfill(3)))
+            save_image(grid, os.path.join(config.img_output_dir, 'img_generator_iter_{}.png'.format(str(g_iter).zfill(3))))
 
             # Testing
             time = t.time() - model.t_begin
@@ -231,20 +162,19 @@ def train(model, train_loader, config):
     model.save_model()
 
 
-def evaluate(model, test_loader, config, D_model_path="ckpt/discriminator.pkl", G_model_path="ckpt/generator.pkl"):
-    model.load_model(D_model_path, G_model_path)
+def evaluate(model, test_loader, config):
+    model.load_model(os.path.join(config.ckpt_path,"discriminator.pkl"), os.path.join(config.ckpt_path,"generator.pkl"))
     z = model.get_torch_variable(torch.randn(config.batch_size, 100, 1, 1))
     samples = model.G(z)
     samples = samples.mul(0.5).add(0.5)
     samples = samples.data.cpu()
     grid = make_grid(samples)
     print("Grid of 8x8 images saved to 'wgan_model_image.png'.")
-    save_image(grid, 'wgan_model_image.png')
+    save_image(grid, os.path.join(config.img_output_dir, 'wgan_model_image.png'))
     
 
 
 def main():
-
 
     configs = {
         "model":"wgan_gp",
@@ -255,38 +185,29 @@ def main():
         "iters": 40000,
         "train": True,
         "cuda": True,
-        "split": 1
+        "split": 1,
+        "type":"train wgan"
+"
     }
 
     wandb.init(project="547_term", config=configs)
     config = wandb.config
+    config.ckpt_path = "ckpt/wgan_gp/split"+str(config.split)
+    config.img_output_dir = "output/wgan_gp/split"+str(config.split)
+
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     model = WGAN_GP(config).to(device)
     
-    train_transform = T.Compose([T.ToPILImage(), T.RandomCrop(32, padding=4), T.RandomHorizontalFlip(), T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
-    val_transform = T.Compose([T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
-
+    # Prepare splitted dataset and loaders
     train_set = torchvision.datasets.CIFAR10(root='./dataset', train=True, download=True)
     val_set = torchvision.datasets.CIFAR10(root='./dataset', train=False, download=True)
-
-    # Separating trainset/testset data/label
-    x_train = train_set.data
-    x_test = val_set.data
-    y_train = train_set.targets
-    y_test = val_set.targets
-
-    split_train_set = DatasetMaker(
-        [get_class_i(x_train, y_train, classDict[class_name]) for class_name in KNOWN_SPLIT_NAMES[config.split]], train_transform)
-
-    split_test_set = DatasetMaker(
-        [get_class_i(x_test, y_test, classDict[class_name]) for class_name in KNOWN_SPLIT_NAMES[config.split]], val_transform)
-
-
-    # Create datasetLoaders from trainset and testset
+    train_transform = T.Compose([T.ToPILImage(), T.RandomCrop(32, padding=4), T.RandomHorizontalFlip(), T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+    val_transform = T.Compose([T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+    split_train_set = split_dataset(train_set, config.split, train_transform)
+    split_val_test = split_dataset(val_set, config.split, val_transform)
     train_loader = DataLoader(split_train_set, batch_size=config.batch_size, shuffle=True, num_workers=8)
-    val_loader = DataLoader(split_test_set, batch_size=config.batch_size, shuffle=False, num_workers=8)
+    val_loader = DataLoader(split_val_test, batch_size=config.batch_size, shuffle=False, num_workers=8)
 
     if config.train:
         train(model,train_loader, config)

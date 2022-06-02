@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 class Classifier(nn.Module):
-    def __init__(self, num_classes=2):
+    def __init__(self, num_classes=6, num_transformations=8):
         super().__init__()
 
         self.layers = nn.Sequential(
@@ -47,7 +47,15 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        self.linear = nn.Linear(128*4*4, num_classes)
+        self.classification_linear = nn.Sequential(
+            nn.Linear(128*4*4, 512),
+            nn.LeakyReLU(0.2),
+            nn.Linear(512,num_classes))
+
+        self.transformation_linear = nn.Sequential(
+            nn.Linear(128*4*4, 512),
+            nn.LeakyReLU(0.2),
+            nn.Linear(512,num_transformations))
 
 
     def forward(self, x, return_features=False):
@@ -57,4 +65,4 @@ class Classifier(nn.Module):
         if return_features:
             return out
         
-        return self.linear(out)
+        return self.classification_linear(out), self.transformation_linear

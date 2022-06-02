@@ -1,5 +1,5 @@
 """
-https://github.com/Zeleni9/pytorch-wgan/blob/master/models/wgan_gradient_penalty.py 
+Adapted from https://github.com/Zeleni9/pytorch-wgan/blob/master/models/wgan_gradient_penalty.py 
 """
 
 import torch
@@ -98,6 +98,9 @@ class WGAN_GP(torch.nn.Module):
         self.D = Discriminator(config.channels)
         self.C = config.channels
 
+        self.ckpt_path = config.ckpt_path
+        self.img_output_dir = config.img_output_dir
+
         # Check if cuda is available
         self.check_cuda(config.cuda)
 
@@ -182,9 +185,11 @@ class WGAN_GP(torch.nn.Module):
         return x.data.cpu().numpy()
 
     def save_model(self):
-        torch.save(self.G.state_dict(), 'ckpt/generator.pkl')
-        torch.save(self.D.state_dict(), 'ckpt/discriminator.pkl')
-        print('Models save to ckpt/generator.pkl & ckpt/discriminator.pkl ')
+        if not os.path.exists(self.ckpt_path):
+            os.makedirs(self.ckpt_path)
+        torch.save(self.G.state_dict(), os.path.join(self.ckpt_path,'generator.pkl'))
+        torch.save(self.D.state_dict(), os.path.join(self.ckpt_path,'discriminator.pkl'))
+        print('Models saved to', str(self.ckpt_path))
 
     def load_model(self, D_model_filename, G_model_filename):
         D_model_path = os.path.join(os.getcwd(), D_model_filename)
@@ -200,8 +205,9 @@ class WGAN_GP(torch.nn.Module):
                 yield images
 
     def generate_latent_walk(self, number):
-        if not os.path.exists('interpolated_images/'):
-            os.makedirs('interpolated_images/')
+        out_dir = os.path.join(self.img_output_dir,'interpolated_images/')
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
 
         number_int = 10
         # interpolate between twe noise(z1, z2).
@@ -225,5 +231,5 @@ class WGAN_GP(torch.nn.Module):
             images.append(fake_im.view(self.C,32,32).data.cpu())
 
         grid = utils.make_grid(images, nrow=number_int )
-        utils.save_image(grid, 'interpolated_images/interpolated_{}.png'.format(str(number).zfill(3)))
+        utils.save_image(grid, os.path.join(out_dir, 'interpolated_{}.png'.format(str(number).zfill(3))))
         print("Saved interpolated images.")

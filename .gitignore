@@ -4,3 +4,7 @@ wandb/*
 dataset/*
 plots/*
 ckpt/*
+training_result_images/*
+data/__pycache__/*
+plots.zip
+inception_score_graph.txt
