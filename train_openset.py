@@ -9,6 +9,7 @@ from torchvision.utils import make_grid, save_image
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
+import pandas
 import random
 import wandb
 from collections import Counter
@@ -20,7 +21,7 @@ from model.vanilla_ae import VanillaAE
 from model.classifier import Classifier
 from model.wgan import WGAN_GP
 from model.utils import to_img
-from data.dataset_maker import split_dataset, KNOWN_SPLITS
+from data.dataset_maker import split_dataset, KNOWN_SPLITS, KNOWN_SPLIT_NAMES, CIFAR_CLASSES
 
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
@@ -55,7 +56,7 @@ def train(G, C, dataloader, optimizer, loss_fn, transformations, device):
     return train_losses
 
 # validation stage
-def find_threshold_at_tp_level(G, C, val_loader, ce_loss, KNOWN_CLASSES, device, min_tp=0.90):
+def find_threshold_at_tp_level(G, C, val_loader, ce_loss, KNOWN_CLASSES, CIFAR_CLASSES, device, min_tp=0.90):
     C.eval()
 
     preds, targets = [], []
@@ -75,6 +76,11 @@ def find_threshold_at_tp_level(G, C, val_loader, ce_loss, KNOWN_CLASSES, device,
 
     val_ce = ce_loss(preds, targets)
 
+    _, pred_idx = torch.max(preds, 1)
+    val_acc = (pred_idx==targets).sum().item() / len(targets)
+
+    wandb.log({"PR curve" : wandb.plot.pr_curve(targets.cpu(), preds.cpu(), labels=CIFAR_CLASSES), "ROC curve": wandb.plot.roc_curve(targets.cpu(), preds.cpu(), labels=CIFAR_CLASSES)})
+
     # calculate FPR and TPR rates
     fpr, tpr, thr, roc_auc = dict(), dict(), dict(), dict()
     for i, cl in enumerate(KNOWN_CLASSES):
@@ -86,10 +92,10 @@ def find_threshold_at_tp_level(G, C, val_loader, ce_loss, KNOWN_CLASSES, device,
         thr_idx = np.argmax(tpr[i]>=0.9)
         thresholds.append(thr[i][thr_idx])
 
-    return val_ce, min(thresholds)
+    return val_ce, val_acc, min(thresholds)
 
 
-def evaluate(G, C, dataloader, threshold, KNOWN_CLASSES, UNK_INDEX, device):
+def evaluate(G, C, dataloader, threshold, KNOWN_CLASSES, UNK_INDEX, device, vis=False):
     C.eval()
     acc = 0.0
 
@@ -103,8 +109,8 @@ def evaluate(G, C, dataloader, threshold, KNOWN_CLASSES, UNK_INDEX, device):
             max_act, indices = torch.max(pred, dim=-1)
             labels = torch.where(max_act < threshold, UNK_INDEX, indices)
             unk_y = torch.where(torch.isin(y, torch.Tensor(KNOWN_CLASSES).to(device)), y, UNK_INDEX)
-            acc += torch.sum(labels == unk_y)
-    
+            acc += (labels == unk_y).sum().item()
+
     return  acc / len(dataloader.dataset)
 
 
@@ -119,6 +125,8 @@ def main():
         "epochs": 250,
         "split": 1,
         "unk_index": 11,
+        "ckpt_period":25,
+        "ckpt_path":"ckpt/openset_vanilla/",
         "type": "train open-set-classifier"
     }
 
@@ -126,6 +134,8 @@ def main():
     config = wandb.config
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if not os.path.exists(config.ckpt_path):
+        os.makedirs(config.ckpt_path)
 
     # Prepare splitted dataset and loaders
     train_transform = T.Compose([T.ToPILImage(), T.RandomCrop(32, padding=4), T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
@@ -151,7 +161,7 @@ def main():
     classifier = Classifier(num_classes=6,num_transformations=8).to(device)
     ce_loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(classifier.parameters(), lr=config.learning_rate, betas=config.betas, weight_decay=1e-4)
-    scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=10, threshold_mode='abs')
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.8, patience=10, threshold_mode='abs')
 
     # freeze generator
     for param in generator.parameters():
@@ -172,13 +182,15 @@ def main():
 
     for i in range(config.epochs):
         train_loss = train(generator, classifier, train_loader, optimizer, ce_loss, transformations, device)
-        val_ce, threshold = find_threshold_at_tp_level(generator, classifier, val_loader, ce_loss, KNOWN_SPLITS[config.split], device)
-        test_acc = evaluate(generator, classifier, val_loader, threshold, KNOWN_SPLITS[config.split], config.unk_index, device)
+        val_ce, val_acc, threshold = find_threshold_at_tp_level(generator, classifier, val_loader, ce_loss, KNOWN_SPLITS[config.split], CIFAR_CLASSES, device)
+        test_acc = evaluate(generator, classifier, test_loader, threshold, KNOWN_SPLITS[config.split], config.unk_index, device)
         scheduler.step(val_ce)
 
-        print('epoch [{}/{}], lr:{:.4f}, train loss:{:.4f}, val loss:{:.4f}, open set acc:{:.4f}'.format(i+1, config.epochs, optimizer.param_groups[0]['lr'], sum(train_loss)/len(train_loss), val_ce, test_acc))
-        wandb.log({"train loss":sum(train_loss)/len(train_loss),"lr":optimizer.param_groups[0]['lr'], "val loss":val_ce, "test - open set accuracy": test_acc})
-
+        print('epoch [{}/{}], lr:{:.4f}, train loss:{:.4f}, val loss:{:.4f}, closed set (val) acc: {:.4f}, open set acc:{:.4f}'.format(i+1, config.epochs, optimizer.param_groups[0]['lr'], sum(train_loss)/len(train_loss), val_ce, val_acc, test_acc))
+        wandb.log({"train loss":sum(train_loss)/len(train_loss),"lr":optimizer.param_groups[0]['lr'], "val loss":val_ce, "val - closed set acc": val_acc, "test - open set accuracy": test_acc})
+        if (i + 1) % config.ckpt_period == 0:
+            save_path = os.path.join(config.ckpt_path, "epoch"+str(i+1)+".pth")
+            torch.save(classifier, save_path)
 
 if __name__ == "__main__":
     main()
