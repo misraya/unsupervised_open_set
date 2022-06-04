@@ -17,7 +17,7 @@ KNOWN_SPLITS = [[0,1,2,4,5,9],
         [3,4,5,7,8,9],
         [0,1,2,3,7,8]]
 KNOWN_SPLIT_NAMES = [[CIFAR_CLASSES[i] for i in s] for s in KNOWN_SPLITS]
-
+UNK_SPLIT_NAMES = [[CIFAR_CLASSES[i] for i in s] for s in SPLITS]
 
 
 # Define a function to separate CIFAR classes by class index
@@ -85,5 +85,17 @@ def split_dataset(dataset, split_ind, transforms):
 
     split_set = DatasetMaker(
         [get_class_i(x_set, y_set, classDict[class_name]) for class_name in KNOWN_SPLIT_NAMES[split_ind]], transforms)
+
+    return split_set
+
+
+def get_unk_dataset(dataset, split_ind, transforms):
+    
+    # Separating trainset/testset data/label
+    x_set = dataset.data
+    y_set = dataset.targets
+
+    split_set = DatasetMaker(
+        [get_class_i(x_set, y_set, classDict[class_name]) for class_name in UNK_SPLIT_NAMES[split_ind]], transforms)
 
     return split_set

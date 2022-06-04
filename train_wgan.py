@@ -117,8 +117,8 @@ def train(model, train_loader, config):
             # inception_score = get_inception_score(new_sample_list, cuda=True, batch_size=32,
             #                                       resize=True, splits=10)
 
-            if not os.path.exists(config.img_output_dir):
-                os.makedirs(config.img_output_dir)
+            if not os.path.exists(config.out_path):
+                os.makedirs(config.out_path)
 
             # Denormalize images and save them in grid 8x8
             z = model.get_torch_variable(torch.randn(800, 100, 1, 1))
@@ -126,7 +126,7 @@ def train(model, train_loader, config):
             samples = samples.mul(0.5).add(0.5)
             samples = samples.data.cpu()[:64]
             grid = make_grid(samples)
-            save_image(grid, os.path.join(config.img_output_dir, 'img_generator_iter_{}.png'.format(str(g_iter).zfill(3))))
+            save_image(grid, os.path.join(config.out_path, 'img_generator_iter_{}.png'.format(str(g_iter).zfill(3))))
 
             # Testing
             time = t.time() - model.t_begin
@@ -170,7 +170,7 @@ def evaluate(model, test_loader, config):
     samples = samples.data.cpu()
     grid = make_grid(samples)
     print("Grid of 8x8 images saved to 'wgan_model_image.png'.")
-    save_image(grid, os.path.join(config.img_output_dir, 'wgan_model_image.png'))
+    save_image(grid, os.path.join(config.out_path, 'wgan_model_image.png'))
     
 
 
@@ -186,18 +186,15 @@ def main():
         "train": True,
         "cuda": True,
         "split": 1,
-        "type":"train wgan"
-"
+        "type":"train wgan",
     }
 
     wandb.init(project="547_term", config=configs)
     config = wandb.config
     config.ckpt_path = "ckpt/wgan_gp/split"+str(config.split)
-    config.img_output_dir = "output/wgan_gp/split"+str(config.split)
-
+    config.out_path = "output/wgan_gp/split"+str(config.split)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = WGAN_GP(config).to(device)
     
     # Prepare splitted dataset and loaders
     train_set = torchvision.datasets.CIFAR10(root='./dataset', train=True, download=True)
@@ -208,6 +205,8 @@ def main():
     split_val_test = split_dataset(val_set, config.split, val_transform)
     train_loader = DataLoader(split_train_set, batch_size=config.batch_size, shuffle=True, num_workers=8)
     val_loader = DataLoader(split_val_test, batch_size=config.batch_size, shuffle=False, num_workers=8)
+
+    model = WGAN_GP(config).to(device)
 
     if config.train:
         train(model,train_loader, config)

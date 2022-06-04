@@ -99,7 +99,7 @@ class WGAN_GP(torch.nn.Module):
         self.C = config.channels
 
         self.ckpt_path = config.ckpt_path
-        self.img_output_dir = config.img_output_dir
+        self.out_path = config.out_path
 
         # Check if cuda is available
         self.check_cuda(config.cuda)
@@ -109,7 +109,7 @@ class WGAN_GP(torch.nn.Module):
         self.g_optimizer = optim.Adam(self.G.parameters(), lr=config.learning_rate, betas=config.betas)
 
         # Set the logger
-        self.number_of_images = 10
+        self.number_of_images = 32
 
         self.generator_iters = config.iters
         self.critic_iter = 5
@@ -205,7 +205,7 @@ class WGAN_GP(torch.nn.Module):
                 yield images
 
     def generate_latent_walk(self, number):
-        out_dir = os.path.join(self.img_output_dir,'interpolated_images/')
+        out_dir = os.path.join(self.out_path,'interpolated_images/')
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
 
