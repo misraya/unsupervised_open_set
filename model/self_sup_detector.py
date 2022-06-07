@@ -332,6 +332,9 @@ def get_self_supervised_detector(replace_first_conv=True):
             conv1.weight[:,:3,:,:] = model.backbone.body.conv1.weight.clone()
             conv1.weight[:,3:,:,:] = model.backbone.body.conv1.weight.clone()
             model.backbone.body.conv1 = conv1
+            
+            model.transform.image_mean = [0.485, 0.456, 0.406, 0.485, 0.456, 0.406]
+            model.transform.image_std = [0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
 
     # create new instance of FastRCNNPredictorPlus with same args as model.roi_heads.box_predictor(FastRCNNPredictor)
     # clone the weights from the pretrained model
@@ -339,9 +342,9 @@ def get_self_supervised_detector(replace_first_conv=True):
     in_channels, out_classes = model.roi_heads.box_predictor.cls_score.in_features, model.roi_heads.box_predictor.cls_score.out_features
     
     # TO DO: FIX load_state_dict() MISMATCH WHEN USING num_classes = 7!!!! Need to skip specific key
-    box_predictor = FastRCNNPredictorPlus(in_channels=in_channels, num_classes=out_classes) #7 # <---------------- IMPORTANT!!
-    box_predictor.cls_score.load_state_dict(model.roi_heads.box_predictor.cls_score.state_dict(), strict=False)
-    box_predictor.bbox_pred.load_state_dict(model.roi_heads.box_predictor.bbox_pred.state_dict(), strict=False)
+    box_predictor = FastRCNNPredictorPlus(in_channels=in_channels, num_classes=7) # out_classes# 7 # <---------------- IMPORTANT!! NEVERMIND, it's a single linear layer, so you don't need to transfer any hidden layer weights
+#     box_predictor.cls_score.load_state_dict(model.roi_heads.box_predictor.cls_score.state_dict(), strict=False)
+#     box_predictor.bbox_pred.load_state_dict(model.roi_heads.box_predictor.bbox_pred.state_dict(), strict=False)
     model.roi_heads.box_predictor = box_predictor
 
 
@@ -362,4 +365,6 @@ def get_self_supervised_detector(replace_first_conv=True):
                              100)
     roi_heads.load_state_dict(model.roi_heads.state_dict())
     model.roi_heads = roi_heads
+    
+    
     return model
