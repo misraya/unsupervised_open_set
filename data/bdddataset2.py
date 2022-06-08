@@ -20,7 +20,7 @@ class OpenSetBDDDataset(Dataset):
         self.ood_categories = ['bicycle', 'motorcycle', 'rider', 'train'] # self.ood_splits[split] # [8, 7, 2, 6]
         self.closed_categories = ['pedestrian', 'car', 'truck', 'bus', 'traffic light', 'traffic sign'] # self.closed_splits[split] # [1, 3, 4, 5, 9, 10]
         self.full_categories = self.ood_categories + self.closed_categories
-        self.remap_dict, self.unmap_dict = self.remap_categories()
+        self.remap_dict, self.unmap_dict, self.category_ids2names = self.remap_categories()
 
         self.aug_labels_dict = self.build_augmentation_labels_dict()
         self.imgIds = self.coco.getImgIds() # all images in dataset
@@ -35,14 +35,19 @@ class OpenSetBDDDataset(Dataset):
     def remap_categories(self):
         # this is so that closed category ids such as [1, 3, 4, 5, 9, 10] get mapped to [0, 1, 2, 3, 4, 5]
         # then the detector's classification head only needs 6 output neurons, and loss can be computed easily
-        remap_dict = {}
-        unmap_dict = {}
+        remap_dict = {0: 0}
+        unmap_dict = {0: 'background'}
         # To do: check what class 0 is supposed to mean for frcnn. background or...?
         for i, catId in enumerate(self.coco.getCatIds(catNms=self.closed_categories)):
             remap_dict[catId] = i + 1 #### IMPORTANT: save the 0 label for background
-            unmap_dict[i+1] = catId
+            unmap_dict[i+1] = self.coco.loadCats(ids=catId)[0]['name']
+        
+        remap_dict[catId+1] = i + 2 # add additional label for visualizations during inference
+        unmap_dict[i+2] = "ood" # add additional label for visualizations during inference
+        
         print(f'Remapping category labels... \n {remap_dict}')
-        return remap_dict, unmap_dict
+        category_ids2names = dict(zip(remap_dict.keys(), unmap_dict.values()))
+        return remap_dict, unmap_dict, category_ids2names
     
     def build_augmentation_labels_dict(self):
         aug_labels_dict = {'111': 0, # (v_flipped == 1 and h_flipped == 1 and factor == 1)
