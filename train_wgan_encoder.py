@@ -15,7 +15,7 @@ from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 
 from model.encoder import Encoder
 from model.wgan import WGAN_GP
-from model.utils import to_img
+from model.utils import to_img, to_4d
 from data.dataset_maker import split_dataset, get_unk_dataset
 
 torch.manual_seed(0)
@@ -23,8 +23,6 @@ torch.cuda.manual_seed(0)
 np.random.seed(0)
 random.seed(0)
 
-def to_4d(x):
-    return x.unsqueeze(-1).unsqueeze(-1)
 
 def train(encoder, generator, dataloader, optimizer, loss_fn, device):
     encoder.train()
@@ -68,24 +66,24 @@ def main():
 
     configs = {
         "channels":3,
-        "train": False,
+        "train": True,
         "cuda": True,
         "iters": 40000,
-        "batch_size": 128,
+        "batch_size": 64,
         "learning_rate":1e-3,
         "betas":(0.5, 0.999),
         "epochs": 100,
-        "split": 1,
+        "split": 4,
         "ckpt_period":25,
         "type":"train wgan encoder",
-        "vis_only":True
+        "vis_only":False
     }
 
     wandb.init(project="547_term", config=configs)
     config = wandb.config
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ckpt_path = os.path.join("ckpt/wgan_encoder", "split" + str(config.split))
-    out_path = os.path.join("output/wgan_encoder", "split" + str(config.split))
+    ckpt_path = os.path.join("ckpt/wgan_encoder", "cifar_split" + str(config.split))
+    out_path = os.path.join("output/wgan_encoder", "cifar_split" + str(config.split))
     config.out_path = out_path
     config.ckpt_path = ckpt_path
 
@@ -102,8 +100,8 @@ def main():
 
     encoder = Encoder().to(device)
     generator = WGAN_GP(config).to(device)
-    d_path = "ckpt/wgan_gp/split"+str(config.split)+"/discriminator.pkl"
-    g_path = "ckpt/wgan_gp/split"+str(config.split)+"/generator.pkl"
+    d_path = "ckpt/wgan_gp/cifar_split"+str(config.split)+"/discriminator.pkl"
+    g_path = "ckpt/wgan_gp/cifar_split"+str(config.split)+"/generator.pkl"
     generator.load_model(d_path, g_path)
 
     for param in list(generator.G.parameters()) + list(generator.D.parameters()):

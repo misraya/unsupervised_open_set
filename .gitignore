@@ -10,3 +10,5 @@ plots.zip
 inception_score_graph.txt
 output/wgan_gp/*/*.png
 output/wgan_encoder/*/*.png
+output/vanilla_ae/*/*.png
+output/vanilla_ae_nonorm/*/*.png

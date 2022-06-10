@@ -1,4 +1,3 @@
-# Adapted from https://github.com/lwneal/counterfactual-open-set/blob/master/generativeopenset/network_definitions.py
 import torch
 import torch.nn as nn
 

@@ -105,3 +105,6 @@ def to_img(x):
     x = x.clamp(0, 1)
     x = x.view(x.size(0), 3, 32, 32)
     return x
+
+def to_4d(x):
+    return x.unsqueeze(-1).unsqueeze(-1)

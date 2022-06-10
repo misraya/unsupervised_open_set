@@ -185,14 +185,14 @@ def main():
         "iters": 40000,
         "train": True,
         "cuda": True,
-        "split": 1,
+        "split": 4,
         "type":"train wgan",
     }
 
     wandb.init(project="547_term", config=configs)
     config = wandb.config
-    config.ckpt_path = "ckpt/wgan_gp/split"+str(config.split)
-    config.out_path = "output/wgan_gp/split"+str(config.split)
+    config.ckpt_path = "ckpt/wgan_gp/cifar_split"+str(config.split)
+    config.out_path = "output/wgan_gp/cifar_split"+str(config.split)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
