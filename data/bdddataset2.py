@@ -5,6 +5,8 @@ from torchvision.io import read_image
 import cv2
 import albumentations as A
 import numpy as np
+import cv2
+import matplotlib.pyplot as plt
 
 class OpenSetBDDDataset(Dataset):
     def __init__(self, split=0, trainval='train', imgDir='data/bdd/images', annDir='data/bdd/labels/det_20'):
@@ -190,7 +192,9 @@ class OpenSetBDDDataset(Dataset):
         
         return img_numpy, new_anns
         
-        
+# Special function for Dataloader so that a batch 
+# is returned as a list of 3D Tensors rather than
+# a single 4D Tensor
 def myCollate(data):
     img_numpys, img_tensors, annss = [], [], []
     for sample in data:
@@ -214,4 +218,15 @@ def move_to_cuda(main_list): #[img_tensors, annss, img_tensor_augs, anns_augs]
             new_main_list.append([img_tensor.cuda() for img_tensor in batch_item])
     return new_main_list
         
-    
+
+def draw_rectangles_and_collect(img_numpys, anns):
+    collection = []
+    for img, ann in zip(img_numpys, anns):
+        img = img.copy()
+        bboxes = ann['boxes'].int().cpu().numpy()
+
+        for b in range(bboxes.shape[0]):
+            x1, y1, x2, y2 = bboxes[b,:]
+            img = cv2.rectangle(img, (x1, y1), (x2, y2), (0,255,0), 2)
+        collection.append(img)
+    return collection   
