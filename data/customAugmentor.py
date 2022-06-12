@@ -108,5 +108,18 @@ class CustomAugmentor():
         
         return img_numpys_aug, img_tensors_aug, reg_tensors_aug, anns_aug
     
+    def augment_without_reconstructions(self, img_numpys, img_tensors, annss):
+        aug_i = np.random.randint(8) # select random [0,7] augmenttaion labels(also the index)
+        #aug_factor = self.aug_factors[aug_i] # find corresponding rotation factor for albumentations
+        #print(f'aug i/label: {aug_i}, aug factor: {aug_factor}')
+
+        t_i = self.tt[aug_i] # get appropriate torchvision transform function
+        a_i = self.at[aug_i] # get appropriate albumentation transform function
+
+        img_tensors_aug = [t_i(img_tensor.clone()) for img_tensor in img_tensors] # transform all img_tensors in list-batchlist-batch
+        img_numpys_aug, anns_aug = self.augment_annotations(img_numpys.copy(), annss.copy(), a_i, aug_i)
+        
+        return img_numpys_aug, img_tensors_aug, anns_aug
+    
     
     
